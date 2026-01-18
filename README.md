@@ -18,7 +18,14 @@ cargo build --release
 
 ## Usage
 
-Start (default subcommand is `up`):
+Start (default subcommand is `up`) with a single proxy URL (no TUN options needed):
+
+```bash
+sudo ./target/release/proxyvpn \
+  --proxy-url "http://alice:secret@192.0.2.10:8080"
+```
+
+Other usage (explicit fields and TUN options):
 
 ```bash
 sudo ./target/release/proxyvpn up \
@@ -26,15 +33,6 @@ sudo ./target/release/proxyvpn up \
   --proxy-port 8080 \
   --username alice \
   --password-file /path/to/secret \
-  --tun-name tun0 \
-  --tun-cidr 172.19.0.1/30
-```
-
-Or pass a single proxy URL:
-
-```bash
-sudo ./target/release/proxyvpn up \
-  --proxy-url "http://alice:secret@192.0.2.10:8080" \
   --tun-name tun0 \
   --tun-cidr 172.19.0.1/30
 ```

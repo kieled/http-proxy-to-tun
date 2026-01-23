@@ -1,33 +1,25 @@
 use std::fs;
+use std::io::{Read as _, Write as _};
 use std::net::IpAddr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
-use crate::firewall::FirewallState;
-use crate::util::{set_permissions_0600, set_permissions_0700};
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SysctlState {
-    pub ipv4_forward: Option<String>,
-    pub ipv6_forward: Option<String>,
-    pub changed: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SingBoxState {
-    pub pid: Option<i32>,
-    pub config_path: PathBuf,
-    pub stdout_path: PathBuf,
-    pub stderr_path: PathBuf,
-}
+use proxyvpn_util::{set_permissions_0600, set_permissions_0700};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RouteBypassRule {
     pub pref: u32,
     pub ip: IpAddr,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "backend", rename_all = "snake_case")]
+pub enum FirewallState {
+    Nft { table: String, chain: String },
+    Iptables { chain: String },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -44,14 +36,13 @@ pub struct State {
     pub dns: Option<IpAddr>,
     pub killswitch: bool,
     pub keep_logs: bool,
+    pub proxy_table: u32,
     #[serde(default)]
     pub dns_bypass_rules: Vec<RouteBypassRule>,
     #[serde(default)]
     pub proxy_bypass_rules: Vec<RouteBypassRule>,
-    pub routes_before: Vec<String>,
+    pub tcp_rule_pref: Option<u32>,
     pub firewall: Option<FirewallState>,
-    pub sysctl: SysctlState,
-    pub sing_box: SingBoxState,
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +57,7 @@ pub struct NewStateParams {
     pub dns: Option<IpAddr>,
     pub killswitch: bool,
     pub keep_logs: bool,
+    pub proxy_table: u32,
 }
 
 #[derive(Clone)]
@@ -93,13 +85,53 @@ impl StateStore {
     }
 
     pub fn create_lock(&self) -> Result<fs::File> {
-        let file = fs::OpenOptions::new()
+        // Try to clean up stale lock first
+        if self.lock_path.exists() && self.is_lock_stale()? {
+            eprintln!("removing stale lock file from crashed instance");
+            let _ = fs::remove_file(&self.lock_path);
+        }
+
+        let mut file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&self.lock_path)
             .with_context(|| "lock file exists (is proxyvpn already running?)")?;
         set_permissions_0600(&self.lock_path)?;
+
+        // Write our PID to the lock file
+        let pid = std::process::id();
+        writeln!(file, "{}", pid).context("failed to write pid to lock")?;
+        file.sync_all()?;
         Ok(file)
+    }
+
+    /// Check if the lock file is stale (process that created it no longer exists)
+    pub fn is_lock_stale(&self) -> Result<bool> {
+        let mut contents = String::new();
+        let mut file = match fs::File::open(&self.lock_path) {
+            Ok(f) => f,
+            Err(_) => return Ok(true), // Can't open = stale
+        };
+        if file.read_to_string(&mut contents).is_err() {
+            return Ok(true); // Can't read = stale
+        }
+
+        let pid: u32 = match contents.trim().parse() {
+            Ok(p) => p,
+            Err(_) => return Ok(true), // Can't parse = old format, assume stale
+        };
+
+        // Check if process is still running by checking /proc/<pid>
+        let proc_path = format!("/proc/{}", pid);
+        Ok(!std::path::Path::new(&proc_path).exists())
+    }
+
+    /// Force remove lock file (for recovery after crash)
+    pub fn force_remove_lock(&self) -> Result<()> {
+        if self.lock_path.exists() {
+            fs::remove_file(&self.lock_path)?;
+        }
+        Ok(())
     }
 
     pub fn write_state(&self, state: &State) -> Result<()> {
@@ -117,11 +149,9 @@ impl StateStore {
 
     pub fn remove_state_files(&self, keep_logs: bool) -> Result<()> {
         let _ = fs::remove_file(&self.lock_path);
-        if !keep_logs {
-            let _ = fs::remove_file(self.state_dir.join("sing-box.stdout.log"));
-            let _ = fs::remove_file(self.state_dir.join("sing-box.stderr.log"));
+        if keep_logs {
+            return Ok(());
         }
-        let _ = fs::remove_file(self.state_dir.join("sing-box.json"));
         let _ = fs::remove_file(&self.state_path);
         let _ = fs::remove_dir(&self.state_dir);
         Ok(())
@@ -133,7 +163,7 @@ pub fn new_state_template(params: NewStateParams) -> State {
         .format(&time::format_description::well_known::Rfc3339)
         .unwrap_or_else(|_| "unknown".to_string());
     State {
-        version: 1,
+        version: 3,
         created_at: now,
         state_dir: params.state_dir.clone(),
         lock_path: params.lock_path.clone(),
@@ -145,39 +175,14 @@ pub fn new_state_template(params: NewStateParams) -> State {
         dns: params.dns,
         killswitch: params.killswitch,
         keep_logs: params.keep_logs,
+        proxy_table: params.proxy_table,
         dns_bypass_rules: Vec::new(),
         proxy_bypass_rules: Vec::new(),
-        routes_before: Vec::new(),
+        tcp_rule_pref: None,
         firewall: None,
-        sysctl: SysctlState {
-            ipv4_forward: None,
-            ipv6_forward: None,
-            changed: false,
-        },
-        sing_box: SingBoxState {
-            pid: None,
-            config_path: params.state_dir.join("sing-box.json"),
-            stdout_path: params.state_dir.join("sing-box.stdout.log"),
-            stderr_path: params.state_dir.join("sing-box.stderr.log"),
-        },
     }
 }
 
-pub fn write_text_file_0600(path: &Path, contents: &str) -> Result<()> {
-    fs::write(path, contents)?;
-    set_permissions_0600(path)?;
-    Ok(())
-}
-
-pub fn open_log_file_0600(path: &Path) -> Result<fs::File> {
-    let file = fs::OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(path)?;
-    set_permissions_0600(path)?;
-    Ok(file)
-}
 
 #[cfg(test)]
 mod tests {
@@ -209,6 +214,7 @@ mod tests {
             dns: None,
             killswitch: true,
             keep_logs: false,
+            proxy_table: 100,
         });
         store.write_state(&state).unwrap();
         let loaded = store.read_state().unwrap();
@@ -216,5 +222,31 @@ mod tests {
         assert_eq!(loaded.proxy_port, 8080);
         assert_eq!(loaded.proxy_ips.len(), 1);
         let _ = store.remove_state_files(true);
+    }
+
+    #[test]
+    fn keep_logs_preserves_state_file() {
+        let state_dir = temp_path("proxyvpn-state-keep");
+        let store = StateStore::new(state_dir.clone());
+        store.ensure_dir().unwrap();
+        let state = new_state_template(NewStateParams {
+            state_dir: store.state_dir.clone(),
+            lock_path: store.lock_path.clone(),
+            tun_name: "tun0".to_string(),
+            tun_cidr: "172.19.0.1/30".to_string(),
+            proxy_host: "proxy.example.com".to_string(),
+            proxy_port: 8080,
+            proxy_ips: vec![IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))],
+            dns: None,
+            killswitch: true,
+            keep_logs: true,
+            proxy_table: 100,
+        });
+        store.write_state(&state).unwrap();
+        let _ = store.create_lock().unwrap();
+        store.remove_state_files(true).unwrap();
+        assert!(store.state_path.exists());
+        assert!(store.state_dir.exists());
+        let _ = store.remove_state_files(false);
     }
 }

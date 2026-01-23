@@ -1,0 +1,14 @@
+[package]
+name = "proxyvpn-mark"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+mnl.workspace = true
+nftnl.workspace = true
+nix.workspace = true
+proxyvpn-util = { path = "../util" }
+
+[features]
+privileged-tests = []

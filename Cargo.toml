@@ -1,20 +1,46 @@
-[package]
-name = "http-tun"
+[workspace]
+members = [
+  "crates/app",
+  "crates/cli",
+  "crates/util",
+  "crates/state",
+  "crates/netlink",
+  "crates/firewall",
+  "crates/mark",
+  "crates/proxy",
+  "crates/tunstack",
+  "crates/proxyvpn",
+  "crates/selftest",
+]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 
-[[bin]]
-name = "proxyvpn"
-path = "src/main.rs"
-
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0"
-clap = { version = "4.5", features = ["derive"] }
-nix = { version = "0.29", features = ["signal", "process", "user"] }
+base64 = "0.22"
+# Optimized clap features - remove color/suggestions for smaller binary
+clap = { version = "4.5", default-features = false, features = ["derive", "std", "help", "usage", "error-context"] }
+futures-util = "0.3"
+httparse = "1.10"
+libc = "0.2"
+mnl = "0.2"
+# Updated netlink crates - BREAKING API changes
+netlink-packet-route = "0.21"
+nftnl = "0.9"
+# Updated to align with nftnl's nix requirement
+nix = { version = "0.30", features = ["signal", "process", "user", "net"] }
+rtnetlink = "0.15"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-signal-hook = "0.3"
+# Optimized smoltcp features - only what we need
+smoltcp = { version = "0.12", default-features = false, features = ["std", "alloc", "medium-ip", "proto-ipv4", "socket-tcp"] }
 time = { version = "0.3", features = ["formatting"] }
+tokio = { version = "1", features = ["io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-util = "0.7"
+tun = { version = "0.6", features = ["async"] }
 url = "2.5"
 
 [profile.release]

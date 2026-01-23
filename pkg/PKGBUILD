@@ -1,0 +1,50 @@
+# Maintainer: Your Name <your.email@example.com>
+# Local development PKGBUILD - install from local source
+pkgname=proxyvpn-git
+pkgver=0.1.0.r3.g9a75136
+pkgrel=1
+pkgdesc="Route TCP traffic through HTTP CONNECT proxy via TUN device"
+arch=('x86_64' 'aarch64')
+url="https://github.com/yourusername/proxyvpn"
+license=('MIT')
+depends=('gcc-libs' 'nftables')
+makedepends=('cargo' 'git')
+optdepends=(
+    'iptables: alternative to nftables for packet marking'
+)
+provides=('proxyvpn')
+conflicts=('proxyvpn')
+install=proxyvpn.install
+# Point to local repo - adjust path as needed
+source=("git+file://${HOME}/work/http-tun")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "http-tun"
+    printf "0.1.0.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+    cd "http-tun"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target}"
+    cargo build --release -p proxyvpn
+}
+
+check() {
+    cd "http-tun"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target}"
+    cargo test --release -p proxyvpn-app --lib || true
+}
+
+package() {
+    cd "http-tun"
+    local _target_dir="${CARGO_TARGET_DIR:-target}"
+
+    # Install binary
+    install -Dm755 "${_target_dir}/release/proxyvpn" "$pkgdir/usr/bin/proxyvpn"
+
+    # Install documentation
+    install -Dm644 "README.md" "$pkgdir/usr/share/doc/${pkgname}/README.md"
+}

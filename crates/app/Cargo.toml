@@ -1,0 +1,22 @@
+[package]
+name = "proxyvpn-app"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+nix.workspace = true
+url.workspace = true
+tokio.workspace = true
+tun.workspace = true
+proxyvpn-cli = { path = "../cli" }
+proxyvpn-firewall = { path = "../firewall" }
+proxyvpn-mark = { path = "../mark" }
+proxyvpn-netlink = { path = "../netlink" }
+proxyvpn-proxy = { path = "../proxy" }
+proxyvpn-state = { path = "../state" }
+proxyvpn-tunstack = { path = "../tunstack" }
+proxyvpn-util = { path = "../util" }
+
+[features]
+privileged-tests = []

@@ -1,0 +1,15 @@
+[package]
+name = "proxyvpn-netlink"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+futures-util.workspace = true
+netlink-packet-route.workspace = true
+rtnetlink.workspace = true
+tokio.workspace = true
+proxyvpn-state = { path = "../state" }
+
+[features]
+privileged-tests = []

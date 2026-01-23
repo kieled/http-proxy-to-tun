@@ -1,27 +1,21 @@
 use std::net::IpAddr;
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser};
 
 #[derive(Parser, Debug)]
 #[command(
     name = "proxyvpn",
     version,
-    about = "System-wide VPN-like proxy via sing-box TUN"
+    about = "System-wide TCP-only proxy via TUN + HTTP CONNECT"
 )]
 pub struct Cli {
-    #[command(subcommand)]
-    pub command: Command,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum Command {
-    Up(Box<UpArgs>),
-    Down(Box<DownArgs>),
+    #[command(flatten)]
+    pub args: RunArgs,
 }
 
 #[derive(Args, Debug, Clone)]
-pub struct CommonArgs {
+pub struct RunArgs {
     /// State directory (tmpfs on Arch)
     #[arg(long, default_value = "/run/proxyvpn")]
     pub state_dir: PathBuf,
@@ -30,19 +24,13 @@ pub struct CommonArgs {
     #[arg(long)]
     pub verbose: bool,
 
-    /// Keep sing-box logs on teardown
+    /// Keep state files on teardown
     #[arg(long)]
     pub keep_logs: bool,
 
     /// Print intended changes without applying
     #[arg(long)]
     pub dry_run: bool,
-}
-
-#[derive(Args, Debug, Clone)]
-pub struct UpArgs {
-    #[command(flatten)]
-    pub common: CommonArgs,
 
     /// Full proxy URL: http://user:pass@host:port
     #[arg(long, conflicts_with_all = ["proxy_host", "proxy_port", "username", "password", "password_file"])]
@@ -77,10 +65,10 @@ pub struct UpArgs {
     pub tun_name: String,
 
     /// TUN interface CIDR
-    #[arg(long, default_value = "172.19.0.1/30")]
+    #[arg(long, default_value = "10.255.255.1/30")]
     pub tun_cidr: String,
 
-    /// DNS IP to enforce through TUN
+    /// DNS IP to allow/bypass (added to allow list)
     #[arg(long)]
     pub dns: Option<IpAddr>,
 
@@ -93,26 +81,11 @@ pub struct UpArgs {
     pub no_killswitch: bool,
 }
 
-#[derive(Args, Debug, Clone)]
-pub struct DownArgs {
-    #[command(flatten)]
-    pub common: CommonArgs,
+pub fn parse_cli() -> Cli {
+    Cli::parse()
 }
 
-pub fn parse_cli_with_default_up() -> Cli {
-    let mut args: Vec<String> = std::env::args().collect();
-    if args.len() <= 1 {
-        args.insert(1, "up".to_string());
-    } else {
-        let first = args.get(1).map(String::as_str).unwrap_or("");
-        if first != "up" && first != "down" {
-            args.insert(1, "up".to_string());
-        }
-    }
-    Cli::parse_from(args)
-}
-
-pub fn read_password(args: &UpArgs) -> anyhow::Result<String> {
+pub fn read_password(args: &RunArgs) -> anyhow::Result<String> {
     if let Some(pw) = &args.password {
         return Ok(pw.clone());
     }
@@ -130,18 +103,12 @@ mod tests {
     use std::net::IpAddr;
     use std::path::PathBuf;
 
-    fn base_common() -> CommonArgs {
-        CommonArgs {
+    fn base_args() -> RunArgs {
+        RunArgs {
             state_dir: PathBuf::from("/tmp/proxyvpn-test"),
             verbose: false,
             keep_logs: false,
             dry_run: false,
-        }
-    }
-
-    fn base_up_args() -> UpArgs {
-        UpArgs {
-            common: base_common(),
             proxy_url: None,
             proxy_host: Some("example.com".to_string()),
             proxy_port: Some(8080),
@@ -150,7 +117,7 @@ mod tests {
             password_file: None,
             proxy_ip: Vec::<IpAddr>::new(),
             tun_name: "tun0".to_string(),
-            tun_cidr: "172.19.0.1/30".to_string(),
+            tun_cidr: "10.255.255.1/30".to_string(),
             dns: None,
             allow_dns: Vec::<IpAddr>::new(),
             no_killswitch: false,
@@ -159,7 +126,7 @@ mod tests {
 
     #[test]
     fn read_password_inline() {
-        let mut args = base_up_args();
+        let mut args = base_args();
         args.password = Some("secret".to_string());
         let pw = read_password(&args).unwrap();
         assert_eq!(pw, "secret");
@@ -167,7 +134,7 @@ mod tests {
 
     #[test]
     fn read_password_file() {
-        let mut args = base_up_args();
+        let mut args = base_args();
         let dir = std::env::temp_dir();
         let path = dir.join(format!("proxyvpn-pw-{}", std::process::id()));
         fs::write(&path, "file-secret\n").unwrap();

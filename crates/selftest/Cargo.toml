@@ -1,0 +1,18 @@
+[package]
+name = "proxyvpn-selftest"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "proxyvpn-selftest"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+proxyvpn-util = { path = "../util" }
+proxyvpn-proxy = { path = "../proxy" }
+tokio.workspace = true
+
+[features]
+privileged-tests = []

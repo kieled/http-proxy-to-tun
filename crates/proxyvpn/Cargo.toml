@@ -1,0 +1,12 @@
+[package]
+name = "proxyvpn"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "proxyvpn"
+path = "src/main.rs"
+
+[dependencies]
+tokio.workspace = true
+proxyvpn-app = { path = "../app" }

@@ -1,0 +1,12 @@
+[package]
+name = "proxyvpn-tunstack"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+futures-util.workspace = true
+smoltcp.workspace = true
+tokio.workspace = true
+tun.workspace = true
+proxyvpn-proxy = { path = "../proxy" }

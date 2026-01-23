@@ -1,8 +1,10 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
 
 use anyhow::{Context, Result, anyhow};
+
+pub mod dns;
 
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -32,38 +34,18 @@ impl CommandRunner {
         Ok(())
     }
 
-    pub fn run_capture(&self, program: &str, args: &[&str]) -> Result<String> {
-        if self.verbose {
-            eprintln!("$ {} {}", program, args.join(" "));
-        }
-        let Output {
-            status,
-            stdout,
-            stderr,
-        } = Command::new(program)
-            .args(args)
-            .output()
-            .with_context(|| format!("failed to run {program}"))?;
-        if !status.success() {
-            return Err(anyhow!(
-                "command failed: {} {}\n{}",
-                program,
-                args.join(" "),
-                String::from_utf8_lossy(&stderr)
-            ));
-        }
-        Ok(String::from_utf8_lossy(&stdout).trim().to_string())
-    }
-
     pub fn run_capture_allow_fail(&self, program: &str, args: &[&str]) -> Result<String> {
         if self.verbose {
             eprintln!("$ {} {}", program, args.join(" "));
         }
-        let Output { stdout, .. } = Command::new(program)
+        if self.dry_run {
+            return Ok(String::new());
+        }
+        let output = Command::new(program)
             .args(args)
             .output()
             .with_context(|| format!("failed to run {program}"))?;
-        Ok(String::from_utf8_lossy(&stdout).trim().to_string())
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 }
 
@@ -94,4 +76,36 @@ pub fn set_permissions_0700(path: &Path) -> Result<()> {
     let perms = std::fs::Permissions::from_mode(0o700);
     std::fs::set_permissions(path, perms)?;
     Ok(())
+}
+
+pub fn has_cap_net_admin() -> bool {
+    const CAP_NET_ADMIN_BIT: u32 = 12;
+    let status = match std::fs::read_to_string("/proc/self/status") {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    for line in status.lines() {
+        if let Some(hex) = line.strip_prefix("CapEff:\t")
+            && let Ok(value) = u64::from_str_radix(hex.trim(), 16)
+        {
+            return (value & (1u64 << CAP_NET_ADMIN_BIT)) != 0;
+        }
+    }
+    false
+}
+
+pub fn is_root() -> bool {
+    let status = match std::fs::read_to_string("/proc/self/status") {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("Uid:\t") {
+            let mut fields = rest.split_whitespace();
+            let _real = fields.next();
+            let effective = fields.next();
+            return matches!(effective, Some("0"));
+        }
+    }
+    false
 }

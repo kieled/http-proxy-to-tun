@@ -1,7 +1,7 @@
 # Maintainer: Your Name <your.email@example.com>
 # Local development PKGBUILD - install from local source
 pkgname=proxyvpn-git
-pkgver=0.1.0.r3.g9a75136
+pkgver=0.1.0.r4.g3ccbcc2
 pkgrel=1
 pkgdesc="Route TCP traffic through HTTP CONNECT proxy via TUN device"
 arch=('x86_64' 'aarch64')

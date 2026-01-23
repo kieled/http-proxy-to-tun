@@ -47,8 +47,8 @@ impl NftMarkBackend {
         // Try native libnftnl first (works with CAP_NET_ADMIN)
         match nft::apply_native(cfg, &self.table, &self.chain) {
             Ok(()) => Ok(()),
-            Err(e) => {
-                eprintln!("native nftnl failed ({e}), falling back to nft command");
+            Err(_) => {
+                // Native failed, try CLI fallback
                 nft::apply(cfg, &self.table, &self.chain, runner)
             }
         }
@@ -75,10 +75,8 @@ pub fn choose_mark_backend() -> Result<MarkBackendKind> {
 
 pub fn remove_mark_rules_best_effort(runner: &CommandRunner) -> Result<()> {
     // Try native removal first (works with CAP_NET_ADMIN)
-    match nft::delete_table("proxyvpn_mark") {
-        Ok(()) => eprintln!("mark: native nft delete succeeded"),
-        Err(e) => eprintln!("mark: native nft delete failed: {e}"),
-    }
+    let _ = nft::delete_table("proxyvpn_mark");
+
     // Always try command-based removal as fallback (needs sudo or setcap on nft)
     if proxyvpn_util::is_root() && proxyvpn_util::find_in_path("nft").is_some() {
         let _ = runner.run_capture_allow_fail("nft", &["delete", "table", "inet", "proxyvpn_mark"]);

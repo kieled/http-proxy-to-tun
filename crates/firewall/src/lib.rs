@@ -45,17 +45,14 @@ impl FirewallBackend for NftBackend {
     }
 
     fn remove(&self, state: &FirewallState, runner: &CommandRunner) -> Result<()> {
-        if let FirewallState::Nft { table, .. } = state {
-            match nft::delete_table(table) {
-                Ok(()) => eprintln!("firewall: native nft delete '{}' succeeded", table),
-                Err(err) => {
-                    eprintln!("firewall: native nft delete '{}' failed: {}", table, err);
-                    if proxyvpn_util::is_root() && nft::find_nft_binary() {
-                        let _ = runner.run_capture_allow_fail("nft", &["delete", "table", "inet", table]);
-                    } else {
-                        return Err(err);
-                    }
-                }
+        if let FirewallState::Nft { table, .. } = state
+            && let Err(err) = nft::delete_table(table)
+        {
+            // Native failed, try CLI fallback
+            if proxyvpn_util::is_root() && nft::find_nft_binary() {
+                let _ = runner.run_capture_allow_fail("nft", &["delete", "table", "inet", table]);
+            } else {
+                return Err(err);
             }
         }
         Ok(())
@@ -105,10 +102,7 @@ impl FirewallBackendKind {
     pub fn remove_best_effort(&self, runner: &CommandRunner) -> Result<()> {
         // Always try to clean up nft table (even if using iptables backend)
         // This handles cases where a previous run used nft but current backend is iptables
-        match nft::delete_table("proxyvpn") {
-            Ok(()) => eprintln!("firewall: native nft delete succeeded"),
-            Err(e) => eprintln!("firewall: native nft delete failed: {e}"),
-        }
+        let _ = nft::delete_table("proxyvpn");
 
         // Also try via nft command (in case native failed - needs sudo or setcap on nft binary)
         if proxyvpn_util::is_root() && nft::find_nft_binary() {

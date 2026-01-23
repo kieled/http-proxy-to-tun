@@ -159,7 +159,7 @@ with `--no-killswitch`.
 
 ### Basic Usage
 
-Start (default subcommand is `up`) with a single proxy URL:
+Start with a single proxy URL:
 
 ```bash
 proxyvpn --proxy-url "http://alice:secret@192.0.2.10:8080"
@@ -168,7 +168,7 @@ proxyvpn --proxy-url "http://alice:secret@192.0.2.10:8080"
 Using separate arguments:
 
 ```bash
-proxyvpn up \
+proxyvpn \
   --proxy-host proxy.example.com \
   --proxy-port 8080 \
   --username alice \
@@ -177,18 +177,12 @@ proxyvpn up \
   --tun-cidr 10.255.255.1/30
 ```
 
-Stop:
-
-```bash
-proxyvpn down
-```
-
-Or press Ctrl+C in the running process.
+To stop, press Ctrl+C. The application will gracefully tear down all routes, rules, and firewall entries.
 
 ### CLI Options
 
 ```
-proxyvpn up [OPTIONS]
+proxyvpn [OPTIONS]
 
 Proxy Configuration:
   --proxy-url <URL>         Full proxy URL: http://user:pass@host:port
@@ -310,13 +304,20 @@ sudo setcap 'cap_net_admin=eip' /usr/local/bin/proxyvpn
 
 ### Clean up after crash
 
+If proxyvpn crashes or is killed without graceful shutdown, clean up manually:
+
 ```bash
-proxyvpn down
-# Or manually:
 ip link del tun0 2>/dev/null
-ip rule del priority 100 2>/dev/null
-ip rule del priority 200 2>/dev/null
+ip rule del pref 1000 2>/dev/null
 nft delete table inet proxyvpn 2>/dev/null
+nft delete table inet proxyvpn_mark 2>/dev/null
+# Or for iptables:
+iptables -D OUTPUT -j PROXYVPN 2>/dev/null
+iptables -F PROXYVPN 2>/dev/null
+iptables -X PROXYVPN 2>/dev/null
+iptables -t mangle -D OUTPUT -j PROXYVPN_MARK 2>/dev/null
+iptables -t mangle -F PROXYVPN_MARK 2>/dev/null
+iptables -t mangle -X PROXYVPN_MARK 2>/dev/null
 ```
 
 ## Architecture

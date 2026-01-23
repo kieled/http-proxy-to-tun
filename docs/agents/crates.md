@@ -3,29 +3,30 @@
 This file is a quick per‑crate reference. Update it on any behavior or structure change.
 
 ## app
-- Role: Orchestrates CLI → setup → tun stack → teardown.
-- Key APIs: `run`, `run_up`, `run_down`, `apply_up`.
+- Role: Orchestrates CLI → setup → tun stack → graceful teardown on Ctrl+C.
+- Key APIs: `run` (single entry point).
 - Depends on: cli, firewall, mark, netlink, proxy, state, tunstack, util.
-- Tests: unit tests for config parsing, overlap detection, and `apply_up` flow.
+- Tests: unit tests for config parsing, overlap detection, and setup flow.
 - Modules: `config`, `ops`, `run`, `teardown`, `tun`.
 
 ## cli
 - Role: CLI definition and parsing helpers.
-- Key APIs: `parse_cli_with_default_up`, `read_password`.
+- Key APIs: `parse_cli`, `read_password`, `Cli`, `RunArgs`.
 - Tests: password parsing (inline/file).
+- Notes: No subcommands; single flat argument structure.
 
 ## firewall
 - Role: nftables (native) + iptables fallback killswitch.
-- Key APIs: `FirewallBackendKind::apply/remove_best_effort`.
+- Key APIs: `FirewallBackendKind::apply`, `FirewallBackendKind::remove_from_state`.
 - Uses libnftnl for native operations; falls back to `nft`/`iptables` CLI only when running as root.
 - Notes: killswitch allows proxy-marked TCP in addition to lo/tun/dns/proxy.
 - Tests: command plan builders for iptables/nft CLI.
 
 ## mark
 - Role: Apply packet mark rules for TCP routing (nft/iptables).
-- Key APIs: `choose_mark_backend`, `remove_mark_rules_best_effort`.
+- Key APIs: `choose_mark_backend`, `MarkBackendKind::apply`, `MarkBackendKind::remove_best_effort`.
 - Tests: command plan builders for iptables/nft CLI.
-- Notes: mark rules exclude proxy IPs and apply to all TCP traffic (overwrites existing marks).
+- Notes: mark rules exclude proxy IPs and DNS IPs, apply to all TCP traffic.
 - CLI fallback runs only when root; CAP_NET_ADMIN is sufficient for native libnftnl.
 
 ## netlink

@@ -61,8 +61,8 @@ fi
 cargo build -p proxyvpn -p proxyvpn-selftest --release
 
 cleanup() {
-  ./target/release/proxyvpn down --state-dir "$STATE_DIR" --keep-logs >/dev/null 2>&1 || true
   if [[ -n "${PROXYVPN_PID:-}" ]]; then
+    # Send SIGINT for graceful shutdown (same as Ctrl+C)
     kill -INT "$PROXYVPN_PID" >/dev/null 2>&1 || true
     wait "$PROXYVPN_PID" >/dev/null 2>&1 || true
   fi

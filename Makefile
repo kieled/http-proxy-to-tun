@@ -1,7 +1,7 @@
 # http-tun Makefile
 # Convenience wrapper around tasks.py
 
-.PHONY: help dev build test lint format clean install uninstall release
+.PHONY: help dev build build-upx test lint format clean install uninstall release release-upx
 
 PYTHON := python3
 TASKS := $(PYTHON) tasks.py
@@ -17,8 +17,14 @@ dev:
 build:
 	@$(TASKS) build
 
+build-upx:
+	@$(TASKS) build --upx
+
 build-cli:
 	@$(TASKS) build:cli
+
+build-cli-upx:
+	@$(TASKS) build:cli --upx
 
 # Testing
 test:
@@ -56,6 +62,9 @@ clean:
 
 release:
 	@$(TASKS) release
+
+release-upx:
+	@$(TASKS) release --upx
 
 debug-collect:
 	@$(TASKS) debug:collect

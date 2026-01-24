@@ -88,8 +88,14 @@ impl ConnectionManager {
     }
 
     pub fn set_connected(&mut self) {
+        use std::time::{SystemTime, UNIX_EPOCH};
         self.state.status = ConnectionStatus::Connected;
-        self.state.connected_since = Some(chrono::Utc::now().timestamp());
+        self.state.connected_since = Some(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0),
+        );
         self.connect_time = Some(Instant::now());
         self.is_running.store(true, Ordering::SeqCst);
     }

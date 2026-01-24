@@ -42,7 +42,7 @@ time = { version = "0.3", features = ["formatting"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-util = "0.7"
 tun = { version = "0.6", features = ["async"] }
-url = "2.5"
+url = { version = "2.5", default-features = false }
 
 # Tauri dependencies
 tauri = { version = "2", features = ["tray-icon"] }
@@ -51,7 +51,6 @@ tauri-plugin-shell = "2"
 keyring = { version = "3", features = ["sync-secret-service"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 dirs = "6"
-chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
 [profile.release]
@@ -59,4 +58,4 @@ opt-level = "z"
 lto = "fat"
 codegen-units = 1
 panic = "abort"
-strip = "debuginfo"  # Keep symbols for Tauri bundling
+strip = "symbols"

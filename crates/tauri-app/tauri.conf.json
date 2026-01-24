@@ -7,7 +7,8 @@
     "beforeDevCommand": "",
     "devUrl": "http://localhost:5173",
     "beforeBuildCommand": "",
-    "frontendDist": "../../ui/dist"
+    "frontendDist": "../../ui/dist",
+    "removeUnusedCommands": true
   },
   "app": {
     "withGlobalTauri": true,

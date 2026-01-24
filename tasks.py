@@ -15,6 +15,11 @@ Tasks:
     clean       Clean build artifacts
     install     Install the application
     release     Build and package for release
+
+Options:
+    --upx       Compress binaries with UPX (~70% smaller, adds startup latency)
+    --debug     Build in debug mode (no release optimizations)
+    -v          Verbose output
 """
 
 import argparse
@@ -41,6 +46,7 @@ class Config:
     verbose: bool = False
     release: bool = True
     parallel: bool = True
+    upx: bool = False  # Enable UPX compression
 
 
 def run(
@@ -115,6 +121,35 @@ def task_dev(cfg: Config) -> None:
         ui_proc.wait()
 
 
+def compress_with_upx(binary_path: Path, cfg: Config) -> bool:
+    """Compress a binary with UPX. Returns True if successful."""
+    if not has_command("upx"):
+        return False
+
+    if not binary_path.exists():
+        return False
+
+    original_size = binary_path.stat().st_size
+    print(f"   Compressing {binary_path.name}...")
+
+    # Use --best for maximum compression, --lzma for better ratio
+    args = ["upx", "--best", "--lzma", str(binary_path)]
+    if cfg.verbose:
+        args.insert(1, "-v")
+    else:
+        args.insert(1, "-q")
+
+    result = run(args, check=False, capture=True)
+    if result.returncode != 0:
+        print(f"   ⚠️  UPX failed for {binary_path.name}")
+        return False
+
+    new_size = binary_path.stat().st_size
+    reduction = (1 - new_size / original_size) * 100
+    print(f"   ✓ {original_size / 1024 / 1024:.1f}MB → {new_size / 1024 / 1024:.1f}MB ({reduction:.0f}% smaller)")
+    return True
+
+
 def task_build(cfg: Config) -> None:
     """Build production release."""
     ensure_command("bun", "https://bun.sh")
@@ -138,6 +173,16 @@ def task_build(cfg: Config) -> None:
         "APPIMAGE_EXTRACT_AND_RUN": "1",
     })
 
+    # UPX compression (optional)
+    if cfg.upx:
+        print("\n→ Compressing with UPX...")
+        if not has_command("upx"):
+            print("   ⚠️  UPX not found, skipping compression")
+            print("   Install: sudo pacman -S upx  # or apt install upx-ucl")
+        else:
+            desktop_bin = TARGET_DIR / "release" / "http-tun-desktop"
+            compress_with_upx(desktop_bin, cfg)
+
     print("\n✅ Build complete!")
     print(f"   Output: {TARGET_DIR / 'release' / 'bundle'}")
 
@@ -153,6 +198,17 @@ def task_build_cli(cfg: Config) -> None:
     if cfg.verbose:
         args.append("--verbose")
     run(args, cwd=ROOT)
+
+    # UPX compression (optional)
+    if cfg.upx and cfg.release:
+        print("\n→ Compressing with UPX...")
+        if not has_command("upx"):
+            print("   ⚠️  UPX not found, skipping compression")
+            print("   Install: sudo pacman -S upx  # or apt install upx-ucl")
+        else:
+            for binary in ["proxyvpn", "proxyvpn-cli"]:
+                bin_path = TARGET_DIR / "release" / binary
+                compress_with_upx(bin_path, cfg)
 
     print("\n✅ CLI build complete!")
 
@@ -407,6 +463,7 @@ def main() -> None:
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     parser.add_argument("-h", "--help", action="store_true", help="Show help")
     parser.add_argument("--debug", action="store_true", help="Debug build (no release)")
+    parser.add_argument("--upx", action="store_true", help="Compress binaries with UPX")
 
     args = parser.parse_args()
 
@@ -422,6 +479,7 @@ def main() -> None:
     cfg = Config(
         verbose=args.verbose,
         release=not args.debug,
+        upx=args.upx,
     )
 
     task_fn, _ = TASKS[args.task]

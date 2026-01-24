@@ -10,7 +10,6 @@ tauri-build = { workspace = true, features = [] }
 
 [dependencies]
 anyhow.workspace = true
-chrono.workspace = true
 dirs.workspace = true
 keyring.workspace = true
 libc.workspace = true
@@ -44,4 +43,4 @@ path = "src/main.rs"
 
 [lib]
 name = "http_tun_desktop"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["rlib"]

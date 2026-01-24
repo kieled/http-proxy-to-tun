@@ -18,7 +18,8 @@ pub struct AppSettings {
     pub theme: Theme,
     pub killswitch: bool,
     pub last_proxy_id: Option<String>,
-    pub minimize_to_tray: bool,
+    #[serde(alias = "minimize_to_tray")]
+    pub close_to_tray: bool,
     pub auto_connect: bool,
 }
 
@@ -28,7 +29,7 @@ impl Default for AppSettings {
             theme: Theme::default(),
             killswitch: true,
             last_proxy_id: None,
-            minimize_to_tray: true,
+            close_to_tray: true,
             auto_connect: false,
         }
     }
@@ -91,8 +92,8 @@ impl SettingsStore {
         self.save()
     }
 
-    pub fn set_minimize_to_tray(&mut self, enabled: bool) -> Result<()> {
-        self.settings.minimize_to_tray = enabled;
+    pub fn set_close_to_tray(&mut self, enabled: bool) -> Result<()> {
+        self.settings.close_to_tray = enabled;
         self.save()
     }
 

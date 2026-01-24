@@ -45,12 +45,12 @@ export function SettingsView({ onBack: _ }: SettingsViewProps) {
         </button>
       </div>
 
-      {/* Minimize to Tray */}
+      {/* Close to Tray */}
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center gap-3">
           <MonitorDown size={18} className="text-text-secondary" />
           <div>
-            <p className="text-sm font-medium text-text">Minimize to Tray</p>
+            <p className="text-sm font-medium text-text">Close to Tray</p>
             <p className="text-xs text-text-secondary">
               Keep running in system tray when closed
             </p>
@@ -59,17 +59,17 @@ export function SettingsView({ onBack: _ }: SettingsViewProps) {
         <button
           type="button"
           onClick={() =>
-            updateSettings({ minimize_to_tray: !settings.minimize_to_tray })
+            updateSettings({ close_to_tray: !settings.close_to_tray })
           }
           className={`
               relative w-11 h-6 rounded-full transition-colors
-              ${settings.minimize_to_tray ? 'bg-accent' : 'bg-border'}
+              ${settings.close_to_tray ? 'bg-accent' : 'bg-border'}
             `}
         >
           <div
             className={`
                 absolute top-1 w-4 h-4 rounded-full bg-white transition-transform
-                ${settings.minimize_to_tray ? 'left-6' : 'left-1'}
+                ${settings.close_to_tray ? 'left-6' : 'left-1'}
               `}
           />
         </button>

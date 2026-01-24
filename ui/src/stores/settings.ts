@@ -19,7 +19,7 @@ const defaultSettings: AppSettings = {
   theme: 'light',
   killswitch: true,
   last_proxy_id: null,
-  minimize_to_tray: true,
+  close_to_tray: true,
   auto_connect: false,
 }
 

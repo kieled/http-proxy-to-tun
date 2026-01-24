@@ -1,5 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { Minus, X } from 'lucide-react'
+import { X } from 'lucide-react'
 
 interface TitlebarProps {
   left?: React.ReactNode
@@ -9,10 +9,6 @@ interface TitlebarProps {
 
 export function Titlebar({ left, center, right }: TitlebarProps) {
   const appWindow = getCurrentWindow()
-
-  const handleMinimize = () => {
-    appWindow.minimize()
-  }
 
   const handleClose = () => {
     appWindow.close()
@@ -34,17 +30,6 @@ export function Titlebar({ left, center, right }: TitlebarProps) {
       {/* Right side - App actions + Window controls */}
       <div className="flex items-center gap-1 justify-end -mr-1">
         {right}
-        <button
-          type="button"
-          onClick={handleMinimize}
-          className="p-2 rounded-sm transition-colors group"
-          title="Minimize"
-        >
-          <Minus
-            size={14}
-            className="text-text-secondary group-hover:text-text"
-          />
-        </button>
         <button
           type="button"
           onClick={handleClose}

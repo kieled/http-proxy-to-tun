@@ -34,7 +34,7 @@ export interface AppSettings {
   theme: Theme
   killswitch: boolean
   last_proxy_id: string | null
-  minimize_to_tray: boolean
+  close_to_tray: boolean
   auto_connect: boolean
 }
 

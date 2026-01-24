@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow};
 
 use super::ops::NetlinkOps;
 
-pub(crate) async fn ensure_tun_cidr_free<N: NetlinkOps>(
+pub async fn ensure_tun_cidr_free<N: NetlinkOps>(
     netlink: &N,
     tun_ip: Ipv4Addr,
     prefix: u8,
@@ -21,7 +21,7 @@ pub(crate) async fn ensure_tun_cidr_free<N: NetlinkOps>(
     Ok(())
 }
 
-pub(crate) fn find_overlapping_addr(
+pub fn find_overlapping_addr(
     addrs: &[Ipv4Addr],
     tun_ip: Ipv4Addr,
     prefix: u8,
@@ -41,7 +41,7 @@ pub(crate) fn find_overlapping_addr(
     None
 }
 
-pub(crate) fn create_tun_device(
+pub fn create_tun_device(
     tun_name: &str,
     tun_ip: Ipv4Addr,
     tun_netmask: Ipv4Addr,

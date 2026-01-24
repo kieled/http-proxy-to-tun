@@ -4,7 +4,7 @@ use proxyvpn_state::State;
 
 use super::ops::{FirewallOps, MarkOps, NetlinkOps, StateStoreOps};
 
-pub(crate) async fn teardown<N, F, M, S>(
+pub async fn teardown<N, F, M, S>(
     state: &State,
     store: &S,
     netlink: &N,

@@ -1,394 +1,263 @@
-# proxyvpn
+# http-tun
 
-System-wide TCP proxy via TUN device and HTTP CONNECT protocol. Routes all TCP traffic through an upstream HTTP proxy without requiring root privileges at runtime.
+A desktop application that routes your entire system's traffic through an HTTP proxy using a TUN (virtual network) interface. Built with Rust and Tauri.
 
-## Features
+> **Note**: This application currently only supports **Linux**.
 
-- **TUN-based routing**: Creates a virtual network interface to intercept TCP traffic
-- **HTTP CONNECT tunneling**: Proxies TCP connections through any HTTP CONNECT-capable proxy
-- **No root at runtime**: Uses `CAP_NET_ADMIN` capability (set once during install)
-- **Firewall killswitch**: Prevents traffic leaks when proxy is unavailable (default: enabled)
-- **DNS bypass**: Automatically allows DNS queries to configured resolvers
-- **nftables/iptables support**: Uses nftables with iptables fallback
-- **Clean teardown**: Properly removes routes, rules, and firewall entries on exit
+## What Does It Do?
 
-## How It Works
+When you run http-tun, it creates a virtual network interface that captures all your system's network traffic and forwards it through an HTTP proxy of your choice. This is useful for:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Application                          │
-│                     (e.g., curl, browser)                   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ TCP SYN
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      nftables/iptables                      │
-│              (mark TCP packets with fwmark)                 │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ fwmark → policy route
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       TUN Device                            │
-│                        (tun0)                               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ raw IP packets
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    proxyvpn (userspace)                     │
-├─────────────────────────────────────────────────────────────┤
-│  smoltcp TCP/IP stack  ←→  HTTP CONNECT proxy client        │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ SO_MARK (bypass fwmark rule)
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     Upstream HTTP Proxy                     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                         Internet
-```
+- Routing all traffic through a corporate proxy
+- Privacy and anonymity setups
+- Network debugging and monitoring
 
-1. Creates a TUN interface and configures policy routing
-2. Marks TCP packets with nftables/iptables to route through the TUN
-3. Reads packets from TUN and processes them with a userspace TCP/IP stack (smoltcp)
-4. For each TCP connection, opens an HTTP CONNECT tunnel to the upstream proxy
-5. Relays data between the local TCP stream and the proxy tunnel
-6. Proxy connections use socket marking (`SO_MARK`) to bypass the TUN routing
+## Prerequisites
 
-### UDP Handling
+Before you begin, make sure you have these installed on your system:
 
-HTTP CONNECT only supports TCP. UDP traffic is handled as follows:
+### 1. Rust (Programming Language)
 
-- **Killswitch ON** (default): UDP is blocked except DNS (port 53) to allowed resolvers
-- **Killswitch OFF**: UDP bypasses the proxy and uses normal routing
+Install Rust using rustup (the official installer):
 
-## Requirements
-
-### System
-
-- **Linux** (kernel 3.17+ for nftables, or any kernel with iptables)
-- **nftables** (preferred) or **iptables** for packet marking
-- **libcap** for setting capabilities (`setcap` command)
-- **iproute2** for route/rule management (`ip` command)
-
-### Build Dependencies
-
-- **Rust toolchain** 1.85+ (edition 2024)
-- **C compiler** (gcc or clang)
-- **pkg-config**
-- **libnftnl-dev** / **libnftnl** (for nftables bindings)
-- **libmnl-dev** / **libmnl** (netlink library)
-
-### Package Installation
-
-**Arch Linux:**
 ```bash
-sudo pacman -S nftables libcap iproute2
-# Build deps (usually already installed)
-sudo pacman -S rust gcc pkgconf libnftnl libmnl
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
+
+After installation, restart your terminal or run:
+
+```bash
+source ~/.cargo/env
+```
+
+Verify the installation:
+
+```bash
+rustc --version
+# Should show something like: rustc 1.XX.X
+```
+
+### 2. Node.js and bun
+
+Install Node.js 18+ from [nodejs.org](https://nodejs.org/) or using your package manager.
+
+Then install bun:
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+Verify installation:
+
+```bash
+node --version  # Should be 18.x or higher
+bun --version   # Should show version number
+```
+
+### 3. System Dependencies (Linux)
+
+Install the required system libraries:
 
 **Debian/Ubuntu:**
+
 ```bash
-sudo apt install nftables libcap2-bin iproute2
-# Build deps
-sudo apt install rustc cargo gcc pkg-config libnftnl-dev libmnl-dev
+sudo apt update
+sudo apt install -y \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    libgtk-3-dev \
+    libwebkit2gtk-4.1-dev \
+    librsvg2-dev \
+    libappindicator3-dev \
+    libmnl-dev \
+    libnftnl-dev
 ```
 
 **Fedora:**
-```bash
-sudo dnf install nftables libcap iproute
-# Build deps
-sudo dnf install rust cargo gcc pkg-config libnftnl-devel libmnl-devel
-```
-
-## Installation
-
-### Quick Install (install.sh)
 
 ```bash
-# Build and install to /usr/local/bin with CAP_NET_ADMIN
-sudo ./install.sh
-
-# Custom install directory
-sudo INSTALL_DIR=/opt/bin ./install.sh
-
-# Build only (no install)
-./install.sh build
-
-# Uninstall
-sudo ./install.sh uninstall
+sudo dnf install -y \
+    gcc \
+    pkg-config \
+    openssl-devel \
+    gtk3-devel \
+    webkit2gtk4.1-devel \
+    librsvg2-devel \
+    libappindicator-gtk3-devel \
+    libmnl-devel \
+    libnftnl-devel
 ```
 
-### Arch Linux (PKGBUILD)
-
-For local development builds:
+**Arch Linux:**
 
 ```bash
-cd pkg
-makepkg -si
+sudo pacman -S --needed \
+    base-devel \
+    openssl \
+    gtk3 \
+    webkit2gtk-4.1 \
+    librsvg \
+    libappindicator-gtk3 \
+    libmnl \
+    libnftnl
 ```
 
-The package automatically sets `CAP_NET_ADMIN` on install via the install hook.
+### 4. Tauri CLI
 
-### Manual Installation
+Install the Tauri command-line tools:
 
 ```bash
-# Build
-cargo build --release -p proxyvpn
-
-# Install binary
-sudo install -Dm755 target/release/proxyvpn /usr/local/bin/proxyvpn
-
-# Set capability (required for non-root operation)
-sudo setcap 'cap_net_admin=eip' /usr/local/bin/proxyvpn
+cargo install tauri-cli
 ```
 
-If you don't want to setcap, run with sudo instead.
+## Installation & Setup
 
-Note: the killswitch uses libnftnl when available, with a fallback to the
-`nft`/`iptables` binaries. If the fallback path is used and you want the
-killswitch enabled without sudo, you must setcap the relevant binary, or run
-with `--no-killswitch`.
-
-## Usage
-
-### Basic Usage
-
-Start with a single proxy URL:
+### Step 1: Clone the Repository
 
 ```bash
-proxyvpn --proxy-url "http://alice:secret@192.0.2.10:8080"
+git clone https://github.com/YOUR_USERNAME/http-tun.git
+cd http-tun
 ```
 
-Using separate arguments:
+### Step 2: Install Frontend Dependencies
+
+Navigate to the UI directory and install packages:
 
 ```bash
-proxyvpn \
-  --proxy-host proxy.example.com \
-  --proxy-port 8080 \
-  --username alice \
-  --password-file /path/to/secret \
-  --tun-name tun0 \
-  --tun-cidr 10.255.255.1/30
+cd ui
+bun install
+cd ..
 ```
-
-To stop, press Ctrl+C. The application will gracefully tear down all routes, rules, and firewall entries.
-
-### CLI Options
-
-```
-proxyvpn [OPTIONS]
-
-Proxy Configuration:
-  --proxy-url <URL>         Full proxy URL: http://user:pass@host:port
-  --proxy-host <HOST>       Upstream proxy hostname
-  --proxy-port <PORT>       Upstream proxy port
-  --username <USER>         Username for proxy auth
-  --password <PASS>         Password (prefer --password-file)
-  --password-file <PATH>    Read password from file
-  --proxy-ip <IP>           Explicit proxy IP (skip DNS resolution, repeatable)
-
-Network Configuration:
-  --tun-name <NAME>         TUN interface name [default: tun0]
-  --tun-cidr <CIDR>         TUN interface CIDR [default: 10.255.255.1/30]
-  --dns <IP>                DNS IP to bypass
-  --allow-dns <IP>          Additional DNS IPs to allow (repeatable)
-  --no-killswitch           Disable firewall killswitch
-
-General:
-  --state-dir <PATH>        State directory [default: /run/proxyvpn]
-  --verbose                 Verbose logging
-  --dry-run                 Print changes without applying
-  --keep-logs               Keep state files on teardown
-```
-
-### Examples
-
-```bash
-# With custom DNS servers
-proxyvpn --proxy-url http://user:pass@proxy:8080 \
-         --allow-dns 8.8.8.8 --allow-dns 8.8.4.4
-
-# Without killswitch (allow direct connections when proxy fails)
-proxyvpn --proxy-url http://proxy:8080 --no-killswitch
-
-# Verbose mode for debugging
-proxyvpn --proxy-url http://proxy:8080 --verbose
-
-# Dry run to see what would be configured
-proxyvpn --proxy-url http://proxy:8080 --dry-run
-```
-
-## Self-test (DNS + routing)
-
-Run a quick DNS probe and dump the current routing rules:
-
-```bash
-cargo run -p proxyvpn-selftest -- --name ifconfig.me
-```
-
-You can override the resolver and skip `ip` output:
-
-```bash
-./target/release/proxyvpn-selftest --name ifconfig.me --server 192.168.0.1
-./target/release/proxyvpn-selftest --no-ip
-```
-
-DNS-over-TCP via proxy (helps debug DNS when UDP is blocked):
-
-```bash
-./target/release/proxyvpn-selftest --proxy-url http://user:pass@proxy:3128 --server 1.1.1.1
-```
-
-Selftest flags summary:
-
-- `--name <HOST>`: DNS name to query (default: `ifconfig.me`)
-- `--server <IPv4>`: DNS server IP (defaults to first IPv4 nameserver in `/etc/resolv.conf`)
-- `--timeout-ms <MS>`: probe timeout (default: 1500)
-- `--no-ip`: skip `ip` command output
-- `--proxy-url <URL>`: perform DNS-over-TCP via HTTP CONNECT
-- `--socket-mark <MARK>`: set SO_MARK on proxy TCP socket (Linux only)
-
-## Troubleshooting
-
-### DNS not resolving
-
-1. Check if DNS servers are in the bypass list:
-   ```bash
-   proxyvpn --verbose --proxy-url ...
-   # Look for "DNS bypass IPs: [...]"
-   ```
-
-2. Add DNS servers explicitly:
-   ```bash
-   proxyvpn --allow-dns 8.8.8.8 --proxy-url ...
-   ```
-
-3. Verify routing rules:
-   ```bash
-   ip rule list
-   ip route show table 100
-   ```
-
-4. If `/etc/resolv.conf` only contains a loopback stub (e.g. `127.0.0.53`) and no upstreams are available in `/run/systemd/resolve/resolv.conf`, you must pass `--allow-dns` or DNS will be blocked when the killswitch is enabled.
-
-### Connection timeouts
-
-1. Verify proxy is reachable:
-   ```bash
-   curl -x http://proxy:port http://example.com
-   ```
-
-2. Check if proxy IP is excluded from marking:
-   ```bash
-   nft list ruleset | grep proxyvpn
-   ```
-
-### Permission denied
-
-Ensure the capability is set:
-```bash
-getcap /usr/local/bin/proxyvpn
-# Should show: /usr/local/bin/proxyvpn cap_net_admin=eip
-```
-
-Re-apply if needed:
-```bash
-sudo setcap 'cap_net_admin=eip' /usr/local/bin/proxyvpn
-```
-
-### Clean up after crash
-
-If proxyvpn crashes or is killed without graceful shutdown, clean up manually:
-
-```bash
-ip link del tun0 2>/dev/null
-ip rule del pref 1000 2>/dev/null
-nft delete table inet proxyvpn 2>/dev/null
-nft delete table inet proxyvpn_mark 2>/dev/null
-# Or for iptables:
-iptables -D OUTPUT -j PROXYVPN 2>/dev/null
-iptables -F PROXYVPN 2>/dev/null
-iptables -X PROXYVPN 2>/dev/null
-iptables -t mangle -D OUTPUT -j PROXYVPN_MARK 2>/dev/null
-iptables -t mangle -F PROXYVPN_MARK 2>/dev/null
-iptables -t mangle -X PROXYVPN_MARK 2>/dev/null
-```
-
-## Architecture
-
-### Crate Structure
-
-| Crate | Description |
-|-------|-------------|
-| `proxyvpn` | Main binary entry point |
-| `proxyvpn-app` | Application orchestration and runtime |
-| `proxyvpn-cli` | CLI argument parsing |
-| `proxyvpn-tunstack` | TUN device + smoltcp TCP/IP stack |
-| `proxyvpn-proxy` | HTTP CONNECT client |
-| `proxyvpn-netlink` | Route and rule management via rtnetlink |
-| `proxyvpn-firewall` | Killswitch firewall rules |
-| `proxyvpn-mark` | Packet marking (nft/iptables) |
-| `proxyvpn-state` | Runtime state persistence |
-| `proxyvpn-util` | DNS helpers and utilities |
-| `proxyvpn-selftest` | DNS and routing diagnostic tool |
-
-### Key Dependencies
-
-- **tokio**: async runtime
-- **tun**: TUN device creation + async read/write
-- **smoltcp**: userspace TCP/IP stack
-- **rtnetlink**: routing, link, and rule management
-- **nftnl/mnl**: nftables rule management via libnftnl
-
-## Notes / Limitations
-
-- Only TCP is proxied. UDP is blocked when the killswitch is enabled, except for DNS (UDP/53) to the allowed resolvers. With killswitch disabled, UDP bypasses directly.
-- HTTPS traffic is tunneled using HTTP CONNECT via the upstream proxy. No TLS decryption is performed.
-- DNS is not automatically reconfigured on the host; use `--dns`/`--allow-dns` to allow resolvers and ensure your system resolver is configured appropriately.
-- IPv4 is supported; IPv6 is not fully handled in firewall rules.
-- Killswitch rules are scoped to a dedicated nftables table (`inet proxyvpn`) or an iptables chain (`PROXYVPN`).
 
 ## Development
 
-### Building
+### Running in Development Mode
+
+Development mode enables hot-reloading so you can see changes instantly.
+
+**Terminal 1** - Start the frontend dev server:
 
 ```bash
-# Debug build
-cargo build
-
-# Release build
-cargo build --release -p proxyvpn
+cd ui
+bun run dev
 ```
 
-### Tests
+**Terminal 2** - Start the Tauri app:
 
-- Unit tests: `scripts/test-unit.sh`
-- Privileged tests (root + netns recommended): `scripts/test-privileged.sh`
-- End-to-end DNS test (requires proxy URL): `scripts/test-e2e.sh`
+```bash
+cd crates/tauri-app
+cargo tauri dev
+```
 
-E2E environment variables:
-- `PROXYVPN_E2E_PROXY_URL=http://user:pass@proxy:3128` (required)
-- `PROXYVPN_E2E_PROXY_URL_RESOLVED=http://user:pass@1.2.3.4:3128` (optional override)
-- `PROXYVPN_E2E_USE_RESOLVED_PROXY=1` (default: resolve hostname to IP before running)
-- `PROXYVPN_E2E_DNS_SERVER=1.1.1.1`
-- `PROXYVPN_E2E_DNS_NAME=ifconfig.me`
-- `PROXYVPN_E2E_ALLOW_DNS=1.1.1.1` (use UDP DNS with killswitch enabled)
-- `PROXYVPN_E2E_SELFTEST_USE_PROXY=1` (default: DNS-over-proxy selftest)
-- `PROXYVPN_E2E_SELFTEST_PROXY_URL=http://user:pass@proxy:3128` (optional override)
-- `PROXYVPN_E2E_SELFTEST_STRICT=1` (default: fail e2e if selftest fails)
-- `PROXYVPN_E2E_SELFTEST_SOCKET_MARK=2` (default: set SO_MARK on proxy TCP in selftest)
+The app will open automatically. Any changes you make to the frontend code will reload instantly.
 
-### Developer docs
+> **Note**: The app requires root privileges to create TUN interfaces. You may be prompted for your password.
 
-- Agent-oriented docs live under `docs/agents/`.
-- If you change code/tests/architecture, update `docs/agents/` and `docs/architecture.md`.
+## Building for Production
+
+### Build the Application
+
+This creates an optimized, release-ready version of the app:
+
+```bash
+# Build the frontend first
+cd ui
+bun run build
+cd ..
+
+# Build the Tauri app
+cd crates/tauri-app
+cargo tauri build
+```
+
+The built application will be located in:
+
+```
+crates/tauri-app/target/release/bundle/
+```
+
+You'll find different formats depending on your needs:
+
+- `deb/` - Debian package (.deb) for Ubuntu/Debian
+- `appimage/` - Portable AppImage that runs on any Linux
+- `rpm/` - RPM package for Fedora/RHEL
+
+### Install the Built Application
+
+**Debian/Ubuntu (.deb):**
+
+```bash
+sudo dpkg -i crates/tauri-app/target/release/bundle/deb/http-tunnel_*.deb
+```
+
+**AppImage (portable, no install needed):**
+
+```bash
+chmod +x crates/tauri-app/target/release/bundle/appimage/http-tunnel_*.AppImage
+./crates/tauri-app/target/release/bundle/appimage/http-tunnel_*.AppImage
+```
+
+**Fedora (.rpm):**
+
+```bash
+sudo rpm -i crates/tauri-app/target/release/bundle/rpm/http-tunnel-*.rpm
+```
+
+## Running the Application
+
+After installation, you can run the app from your application menu or from the terminal:
+
+```bash
+http-tun-desktop
+```
+
+> **Important**: The app requires root/sudo privileges to work with network interfaces.
+
+## Project Structure
+
+```
+http-tun/
+├── ui/                     # React frontend (TypeScript)
+├── crates/
+│   ├── tauri-app/         # Tauri desktop wrapper
+│   ├── app/               # Core application logic
+│   ├── proxy/             # HTTP proxy implementation
+│   ├── tunstack/          # TUN interface handling
+│   ├── netlink/           # Linux netlink bindings
+│   ├── firewall/          # nftables firewall rules
+│   └── ...                # Other utility crates
+├── Cargo.toml             # Rust workspace configuration
+└── README.md              # This file
+```
+
+## Troubleshooting
+
+### "Permission denied" when running
+
+The app needs root privileges. Run with sudo or configure proper capabilities.
+
+### Build fails with missing libraries
+
+Make sure you've installed all system dependencies listed in the Prerequisites section.
+
+### Tauri CLI not found
+
+Run `cargo install tauri-cli` and ensure `~/.cargo/bin` is in your PATH.
+
+### Frontend dev server not connecting
+
+Make sure the Vite dev server is running on port 5173 before starting the Tauri app.
+
+## Documentation
+
+- [Contributing](./CONTRIBUTING.md)
+- [Security Policy](./SECURITY.md)
+
+## AI-Assisted Development
+
+This project uses Claude Code for AI-assisted development. See [CLAUDE.md](./CLAUDE.md) for guidelines.
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.

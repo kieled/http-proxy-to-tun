@@ -11,6 +11,7 @@ members = [
   "crates/tunstack",
   "crates/proxyvpn",
   "crates/selftest",
+  "crates/tauri-app",
 ]
 resolver = "2"
 
@@ -43,9 +44,19 @@ tokio-util = "0.7"
 tun = { version = "0.6", features = ["async"] }
 url = "2.5"
 
+# Tauri dependencies
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-build = "2"
+tauri-plugin-shell = "2"
+keyring = { version = "3", features = ["sync-secret-service"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+dirs = "6"
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+
 [profile.release]
 opt-level = "z"
 lto = "fat"
 codegen-units = 1
 panic = "abort"
-strip = true
+strip = "debuginfo"  # Keep symbols for Tauri bundling

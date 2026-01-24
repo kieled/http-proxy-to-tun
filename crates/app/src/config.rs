@@ -6,7 +6,7 @@ use proxyvpn_cli::{RunArgs, read_password};
 use proxyvpn_proxy::ProxyConfig;
 use proxyvpn_util::dns;
 
-pub(crate) fn resolve_proxy_ips(host: &str, port: u16, overrides: &[IpAddr]) -> Result<Vec<IpAddr>> {
+pub fn resolve_proxy_ips(host: &str, port: u16, overrides: &[IpAddr]) -> Result<Vec<IpAddr>> {
     if !overrides.is_empty() {
         return Ok(dedup_ips(overrides));
     }
@@ -20,7 +20,7 @@ pub(crate) fn resolve_proxy_ips(host: &str, port: u16, overrides: &[IpAddr]) -> 
     Ok(dedup_ips(&addrs))
 }
 
-pub(crate) fn parse_proxy_config(args: &RunArgs) -> Result<ProxyConfig> {
+pub fn parse_proxy_config(args: &RunArgs) -> Result<ProxyConfig> {
     if let Some(url) = &args.proxy_url {
         return parse_proxy_url(url);
     }
@@ -46,11 +46,11 @@ pub(crate) fn parse_proxy_config(args: &RunArgs) -> Result<ProxyConfig> {
     })
 }
 
-pub(crate) fn parse_proxy_url(raw: &str) -> Result<ProxyConfig> {
+pub fn parse_proxy_url(raw: &str) -> Result<ProxyConfig> {
     ProxyConfig::from_http_url(raw)
 }
 
-pub(crate) fn resolve_dns_allow(args: &RunArgs) -> Result<Vec<IpAddr>> {
+pub fn resolve_dns_allow(args: &RunArgs) -> Result<Vec<IpAddr>> {
     let resolv = dns::parse_resolv_conf("/etc/resolv.conf");
     let systemd = dns::parse_resolv_conf("/run/systemd/resolve/resolv.conf");
     resolve_dns_allow_from(args, &resolv, &systemd)
@@ -77,7 +77,7 @@ fn resolve_dns_allow_from(
     Ok(dedup_ips(&ips))
 }
 
-pub(crate) async fn add_bypass_rules<N: super::ops::NetlinkOps>(
+pub async fn add_bypass_rules<N: super::ops::NetlinkOps>(
     netlink: &N,
     prefs: &mut HashSet<u32>,
     start_pref: u32,
@@ -98,7 +98,7 @@ pub(crate) async fn add_bypass_rules<N: super::ops::NetlinkOps>(
     Ok(rules)
 }
 
-pub(crate) fn dedup_ips(ips: &[IpAddr]) -> Vec<IpAddr> {
+pub fn dedup_ips(ips: &[IpAddr]) -> Vec<IpAddr> {
     let mut out = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for ip in ips {
@@ -109,7 +109,7 @@ pub(crate) fn dedup_ips(ips: &[IpAddr]) -> Vec<IpAddr> {
     out
 }
 
-pub(crate) fn next_pref(prefs: &mut HashSet<u32>, mut pref: u32) -> u32 {
+pub fn next_pref(prefs: &mut HashSet<u32>, mut pref: u32) -> u32 {
     while prefs.contains(&pref) {
         pref += 1;
     }
@@ -117,7 +117,7 @@ pub(crate) fn next_pref(prefs: &mut HashSet<u32>, mut pref: u32) -> u32 {
     pref
 }
 
-pub(crate) fn parse_tun_cidr(cidr: &str) -> Result<(Ipv4Addr, Ipv4Addr, u8)> {
+pub fn parse_tun_cidr(cidr: &str) -> Result<(Ipv4Addr, Ipv4Addr, u8)> {
     let (addr_str, prefix_str) = cidr
         .split_once('/')
         .ok_or_else(|| anyhow!("invalid TUN CIDR (expected A.B.C.D/NN)"))?;

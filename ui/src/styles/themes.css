@@ -1,0 +1,108 @@
+/* Theme tokens using Tailwind v4 @theme */
+@theme {
+  /* Light theme (default) */
+  --color-background: oklch(1 0 0);
+  --color-surface: oklch(0.985 0 0);
+  --color-border: oklch(0.9 0 0);
+  --color-muted: oklch(0.7 0 0);
+  --color-text: oklch(0.15 0 0);
+  --color-text-secondary: oklch(0.45 0 0);
+
+  /* Accent colors - pastel green */
+  --color-accent: oklch(0.7 0.12 155);
+  --color-accent-hover: oklch(0.65 0.14 155);
+  --color-success: oklch(0.7 0.12 155);
+  --color-success-glow: oklch(0.75 0.1 155 / 0.4);
+  --color-warning: oklch(0.78 0.12 75);
+  --color-warning-glow: oklch(0.8 0.1 75 / 0.4);
+  --color-error: oklch(0.65 0.14 25);
+
+  /* Animation tokens */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* Dark theme */
+.theme-dark {
+  --color-background: oklch(0.18 0 0);
+  --color-surface: oklch(0.22 0 0);
+  --color-border: oklch(0.32 0 0);
+  --color-muted: oklch(0.5 0 0);
+  --color-text: oklch(0.95 0 0);
+  --color-text-secondary: oklch(0.7 0 0);
+
+  --color-accent: oklch(0.72 0.12 155);
+  --color-accent-hover: oklch(0.78 0.14 155);
+  --color-success: oklch(0.72 0.12 155);
+  --color-success-glow: oklch(0.75 0.1 155 / 0.5);
+  --color-warning: oklch(0.8 0.12 75);
+  --color-warning-glow: oklch(0.82 0.1 75 / 0.5);
+}
+
+/* Full dark (OLED) theme */
+.theme-full-dark {
+  --color-background: oklch(0 0 0);
+  --color-surface: oklch(0.1 0 0);
+  --color-border: oklch(0.2 0 0);
+  --color-muted: oklch(0.45 0 0);
+  --color-text: oklch(0.95 0 0);
+  --color-text-secondary: oklch(0.65 0 0);
+
+  --color-accent: oklch(0.72 0.12 155);
+  --color-accent-hover: oklch(0.78 0.14 155);
+  --color-success: oklch(0.72 0.12 155);
+  --color-success-glow: oklch(0.75 0.1 155 / 0.6);
+  --color-warning: oklch(0.8 0.12 75);
+  --color-warning-glow: oklch(0.82 0.1 75 / 0.6);
+}
+
+/* Apply theme colors */
+:root,
+.theme-light {
+  color-scheme: light;
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+.theme-dark,
+.theme-full-dark {
+  color-scheme: dark;
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+/* Connection button animations */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px 5px var(--glow-color);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 30px 10px var(--glow-color);
+    opacity: 0.8;
+  }
+}
+
+@keyframes connecting-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 15px 3px var(--color-warning-glow);
+    border-color: var(--color-warning);
+  }
+  50% {
+    box-shadow: 0 0 25px 8px var(--color-warning-glow);
+    border-color: oklch(0.85 0.14 75);
+  }
+}
+
+.animate-connecting {
+  animation: connecting-pulse 1.5s ease-in-out infinite;
+}
+
+.animate-connected {
+  --glow-color: var(--color-success-glow);
+  animation: pulse-glow 3s ease-in-out infinite;
+}

@@ -1,5 +1,7 @@
 # http-tun
 
+![image (1)](https://github.com/user-attachments/assets/067e07f4-5a36-4bf7-bd78-6b7cc2b8528e)
+
 A desktop application that routes your entire system's traffic through an HTTP proxy using a TUN (virtual network) interface. Built with Rust and Tauri.
 
 > **Note**: This application currently only supports **Linux**.

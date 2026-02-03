@@ -10,15 +10,17 @@ pub(crate) struct IptablesPlan {
 }
 
 pub(crate) fn build_plan(cfg: &FirewallConfig, chain: &str) -> IptablesPlan {
-    let mut cleanup = Vec::new();
-    cleanup.push(vec!["-D", "OUTPUT", "-j", chain].into_iter().map(String::from).collect());
-    cleanup.push(vec!["-F", chain].into_iter().map(String::from).collect());
-    cleanup.push(vec!["-X", chain].into_iter().map(String::from).collect());
+    let cleanup: Vec<Vec<String>> = vec![
+        vec!["-D", "OUTPUT", "-j", chain].into_iter().map(String::from).collect(),
+        vec!["-F", chain].into_iter().map(String::from).collect(),
+        vec!["-X", chain].into_iter().map(String::from).collect(),
+    ];
 
-    let mut setup = Vec::new();
-    setup.push(vec!["-N", chain].into_iter().map(String::from).collect());
-    setup.push(vec!["-A", chain, "-o", "lo", "-j", "ACCEPT"].into_iter().map(String::from).collect());
-    setup.push(vec!["-A", chain, "-o", cfg.tun_name, "-j", "ACCEPT"].into_iter().map(String::from).collect());
+    let mut setup: Vec<Vec<String>> = vec![
+        vec!["-N", chain].into_iter().map(String::from).collect(),
+        vec!["-A", chain, "-o", "lo", "-j", "ACCEPT"].into_iter().map(String::from).collect(),
+        vec!["-A", chain, "-o", cfg.tun_name, "-j", "ACCEPT"].into_iter().map(String::from).collect(),
+    ];
     setup.push(vec![
         "-A".to_string(),
         chain.to_string(),

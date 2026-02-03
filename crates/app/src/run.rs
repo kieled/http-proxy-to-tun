@@ -23,20 +23,40 @@ const PROXY_BYPASS_MARK: u32 = 0x2;
 
 pub async fn run() -> Result<()> {
     let cli = parse_cli();
-    run_with_args(cli.args).await
+    run_with_args(&cli.args).await
 }
 
-async fn run_with_args(args: RunArgs) -> Result<()> {
+pub async fn run_with_args(args: &RunArgs) -> Result<()> {
+    // Create a dummy channel that we never send on
+    let (ready_tx, _ready_rx) = tokio::sync::oneshot::channel::<Result<(), String>>();
+    run_with_args_and_ready(args, ready_tx).await
+}
+
+/// Run the VPN with a ready channel to signal when setup is complete
+pub async fn run_with_args_and_ready(
+    args: &RunArgs,
+    ready_tx: tokio::sync::oneshot::Sender<Result<(), String>>,
+) -> Result<()> {
+    run_with_args_inner(args, Some(ready_tx)).await
+}
+
+async fn run_with_args_inner(
+    args: &RunArgs,
+    ready_tx: Option<tokio::sync::oneshot::Sender<Result<(), String>>>,
+) -> Result<()> {
     ensure_linux()?;
     ensure_net_admin()?;
     ensure_deps()?;
 
-    let proxy = parse_proxy_config(&args)?;
+    let proxy = parse_proxy_config(args)?;
     let proxy_ips = resolve_proxy_ips(&proxy.host, proxy.port, &args.proxy_ip)?;
-    let state_dir = resolve_state_dir(&args);
+    let state_dir = resolve_state_dir(args);
 
     if args.dry_run {
-        print_dry_run(&args, &proxy, &proxy_ips, &state_dir);
+        print_dry_run(args, &proxy, &proxy_ips, &state_dir);
+        if let Some(tx) = ready_tx {
+            let _ = tx.send(Ok(()));
+        }
         return Ok(());
     }
 
@@ -58,8 +78,8 @@ async fn run_with_args(args: RunArgs) -> Result<()> {
     let firewall = RealFirewall::new(firewall_backend, runner.clone());
     let mark = RealMark::new(mark_backend, runner.clone());
 
-    let state = setup(
-        &args,
+    let state = match setup(
+        args,
         proxy.clone(),
         proxy_ips.clone(),
         &store,
@@ -67,7 +87,23 @@ async fn run_with_args(args: RunArgs) -> Result<()> {
         &firewall,
         &mark,
     )
-    .await?;
+    .await
+    {
+        Ok(state) => {
+            // Signal that setup completed successfully
+            if let Some(tx) = ready_tx {
+                let _ = tx.send(Ok(()));
+            }
+            state
+        }
+        Err(e) => {
+            // Signal setup failure
+            if let Some(tx) = ready_tx {
+                let _ = tx.send(Err(e.to_string()));
+            }
+            return Err(e);
+        }
+    };
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
     let stack_cfg = TunStackConfig {

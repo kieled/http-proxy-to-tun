@@ -10,18 +10,19 @@ use proxyvpn_util::CommandRunner;
 use crate::MarkConfig;
 
 pub(crate) fn build_commands(cfg: &MarkConfig, table: &str, chain: &str) -> Vec<Vec<String>> {
-    let mut cmds = Vec::new();
-    cmds.push(vec!["delete", "table", "inet", table].into_iter().map(String::from).collect());
-    cmds.push(vec!["add", "table", "inet", table].into_iter().map(String::from).collect());
-    cmds.push(vec![
-        "add", "chain", "inet", table, chain, "{", "type", "route", "hook", "output",
-        "priority", "-150", ";", "policy", "accept", ";", "}",
-    ].into_iter().map(String::from).collect());
-    // Early accept for non-TCP traffic (UDP DNS, ICMP, etc.) to avoid any
-    // interference from the type route chain processing
-    cmds.push(vec![
-        "add", "rule", "inet", table, chain, "meta", "l4proto", "!=", "tcp", "accept",
-    ].into_iter().map(String::from).collect());
+    let mut cmds: Vec<Vec<String>> = vec![
+        vec!["delete", "table", "inet", table].into_iter().map(String::from).collect(),
+        vec!["add", "table", "inet", table].into_iter().map(String::from).collect(),
+        vec![
+            "add", "chain", "inet", table, chain, "{", "type", "route", "hook", "output",
+            "priority", "-150", ";", "policy", "accept", ";", "}",
+        ].into_iter().map(String::from).collect(),
+        // Early accept for non-TCP traffic (UDP DNS, ICMP, etc.) to avoid any
+        // interference from the type route chain processing
+        vec![
+            "add", "rule", "inet", table, chain, "meta", "l4proto", "!=", "tcp", "accept",
+        ].into_iter().map(String::from).collect(),
+    ];
     for ip in cfg.exclude_ips.iter().filter(|ip| ip.is_ipv4()) {
         cmds.push(vec![
             "add".to_string(),

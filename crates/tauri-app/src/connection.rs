@@ -163,15 +163,13 @@ pub fn check_privileges() -> Result<bool> {
     // Try to read capabilities from /proc/self/status
     if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
         for line in status.lines() {
-            if line.starts_with("CapEff:") {
-                if let Some(cap_hex) = line.split_whitespace().nth(1) {
-                    if let Ok(caps) = u64::from_str_radix(cap_hex, 16) {
-                        // CAP_NET_ADMIN is bit 12
-                        if caps & (1 << 12) != 0 {
-                            return Ok(true);
-                        }
-                    }
-                }
+            if line.starts_with("CapEff:")
+                && let Some(cap_hex) = line.split_whitespace().nth(1)
+                && let Ok(caps) = u64::from_str_radix(cap_hex, 16)
+                // CAP_NET_ADMIN is bit 12
+                && caps & (1 << 12) != 0
+            {
+                return Ok(true);
             }
         }
     }

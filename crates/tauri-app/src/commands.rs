@@ -51,6 +51,7 @@ pub async fn add_proxy(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn update_proxy(
     app: AppHandle,
     state: State<'_, AppState>,

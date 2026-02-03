@@ -1,0 +1,66 @@
+[package]
+name = "proxyvpn-iced"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = ["tray"]
+tray = ["dep:tray-icon", "dep:muda", "dep:gtk"]
+
+[[bin]]
+name = "proxyvpn-gui"
+path = "src/main.rs"
+
+[dependencies]
+# Core Iced
+iced = { version = "0.14", features = ["tokio", "image", "svg"] }
+
+# System tray support (optional)
+# Note: without libxdo feature, avoids X11 dependency, works on Wayland
+tray-icon = { version = "0.19", optional = true, default-features = false }
+muda = { version = "0.15", optional = true, default-features = false }
+
+# GTK for tray initialization on Linux
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = { version = "0.18", optional = true }
+
+# Existing workspace crates
+proxyvpn-app = { path = "../app" }
+proxyvpn-cli = { path = "../cli" }
+proxyvpn-state = { path = "../state" }
+proxyvpn-util = { path = "../util" }
+
+# Async runtime (shared with backend)
+tokio = { workspace = true }
+
+# Serialization for settings
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Secure credential storage
+keyring = { workspace = true }
+
+# UUID for proxy IDs
+uuid = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Icons and images
+image = "0.25"
+
+# Directory paths
+dirs = { workspace = true }
+
+# Time for uptime display
+time = { workspace = true }
+
+# HTTP client for IP fetching
+reqwest = { workspace = true }
+
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "2.4"

@@ -1,7 +1,7 @@
 # http-tun Makefile
 # Convenience wrapper around tasks.py
 
-.PHONY: help dev build build-upx test lint format clean install uninstall release release-upx
+.PHONY: help dev build build-upx test lint format clean install uninstall release release-upx setup-caps set-caps build-gui
 
 PYTHON := python3
 TASKS := $(PYTHON) tasks.py
@@ -68,3 +68,16 @@ release-upx:
 
 debug-collect:
 	@$(TASKS) debug:collect
+
+# GUI with capabilities
+build-gui:
+	cargo build -p proxyvpn-iced --release
+	@./scripts/set-caps.sh release
+
+# One-time setup for capability permissions (requires sudo)
+setup-caps:
+	sudo ./scripts/setup-capabilities.sh
+
+# Set capabilities on existing binaries
+set-caps:
+	@./scripts/set-caps.sh release

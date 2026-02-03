@@ -165,6 +165,12 @@ async fn resolve_proxy_addr(proxy: &ProxyConfig) -> Result<SocketAddr> {
 fn set_socket_mark(socket: &TcpSocket, mark: u32) -> Result<()> {
     let fd = socket.as_raw_fd();
     let value: libc::c_uint = mark;
+    // SAFETY: This is safe because:
+    // 1. `fd` is a valid file descriptor obtained from `socket.as_raw_fd()`
+    // 2. `SOL_SOCKET` and `SO_MARK` are valid option level and name for setsockopt
+    // 3. `value` is a stack-allocated c_uint with a valid address
+    // 4. `size_of_val(&value)` correctly reports the size of a c_uint
+    // 5. The kernel validates the fd and option, returning an error code if invalid
     let ret = unsafe {
         libc::setsockopt(
             fd,

@@ -5,11 +5,12 @@ use proxyvpn_util::CommandRunner;
 use crate::MarkConfig;
 
 pub(crate) fn build_commands(cfg: &MarkConfig, chain: &str) -> Vec<Vec<String>> {
-    let mut cmds = Vec::new();
-    cmds.push(vec!["-t", "mangle", "-D", "OUTPUT", "-j", chain].into_iter().map(String::from).collect());
-    cmds.push(vec!["-t", "mangle", "-F", chain].into_iter().map(String::from).collect());
-    cmds.push(vec!["-t", "mangle", "-X", chain].into_iter().map(String::from).collect());
-    cmds.push(vec!["-t", "mangle", "-N", chain].into_iter().map(String::from).collect());
+    let mut cmds: Vec<Vec<String>> = vec![
+        vec!["-t", "mangle", "-D", "OUTPUT", "-j", chain].into_iter().map(String::from).collect(),
+        vec!["-t", "mangle", "-F", chain].into_iter().map(String::from).collect(),
+        vec!["-t", "mangle", "-X", chain].into_iter().map(String::from).collect(),
+        vec!["-t", "mangle", "-N", chain].into_iter().map(String::from).collect(),
+    ];
     for ip in cfg.exclude_ips.iter().filter(|ip| ip.is_ipv4()) {
         cmds.push(vec![
             "-t".to_string(),
